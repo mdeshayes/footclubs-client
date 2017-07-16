@@ -55,8 +55,10 @@ public class LicenceExtractor {
 		LicenceExtractor licenceExtractor = new LicenceExtractor();
 
 		licenceExtractor.login(properties.getProperty("username"), properties.getProperty("password"))
-				.flatMap(response -> licenceExtractor.retrieveLicencies(response.headers().get("Set-Cookie"), licenceQueryParam))
-				.flatMap(licenceExtractor::toLicences).subscribe(System.out::println, System.out::println, () -> {
+				.flatMap(response -> licenceExtractor.retrieveLicencies(response.headers()
+						.get("Set-Cookie"), licenceQueryParam))
+				.flatMap(licenceExtractor::toLicences)
+				.subscribe(System.out::println, System.out::println, () -> {
 					System.out.println("complete");
 					vertx.close();
 				});
@@ -68,11 +70,15 @@ public class LicenceExtractor {
 			try {
 				Document doc = Jsoup.parse(body);
 				Element table = doc.getElementById("EXT_CLB_LIC_LIST_GRID");
-				Element tBody = table.getElementsByTag("tbody").first();
+				Element tBody = table.getElementsByTag("tbody")
+						.first();
 				Elements rows = tBody.getElementsByTag("tr");
-				rows.parallelStream().filter(element -> {
-					return !element.className().equals("backmenu");
-				}).map(this::extractLicence).filter(Objects::nonNull).forEach(sub::onNext);
+				rows.parallelStream()
+						.filter(element -> !element.className()
+								.equals("backmenu"))
+						.map(this::extractLicence)
+						.filter(Objects::nonNull)
+						.forEach(sub::onNext);
 				sub.onComplete();
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -105,37 +111,50 @@ public class LicenceExtractor {
 	}
 
 	private String extractLicenceInfo(Element trElement, String pattern) throws Exception {
-		return trElement.getElementsByTag("td").stream().filter(tdElement -> {
-			return tdElement.toString().matches(pattern);
-		}).findFirst().map(tdElement -> {
-			Matcher matcher = Pattern.compile(pattern).matcher(tdElement.toString());
-			if (matcher.matches()) {
-				return matcher.group(1);
-			} else {
-				throw new IllegalStateException(tdElement.toString() + " doesn't match " + LICENCE_ID_PATTERN);
-			}
-		}).orElseThrow(() -> new Exception("Pattern '" + pattern + "' not found"));
+		return trElement.getElementsByTag("td")
+				.stream()
+				.filter(tdElement -> tdElement.toString()
+						.matches(pattern))
+				.findFirst()
+				.map(tdElement -> {
+					Matcher matcher = Pattern.compile(pattern)
+							.matcher(tdElement.toString());
+					if (matcher.matches()) {
+						return matcher.group(1);
+					} else {
+						throw new IllegalStateException(tdElement.toString() + " doesn't match " + LICENCE_ID_PATTERN);
+					}
+				})
+				.orElseThrow(() -> new Exception("Pattern '" + pattern + "' not found"));
 	}
 
 	private Observable<HttpClientResponse> login(String username, String password) {
 		String body = "p_username=" + username + "&p_password=" + password + "&app=FOOTCLUBS";
 		return Observable.create(sub -> {
-			client.post(new RequestOptions().setPort(443).setHost("footclubs.fff.fr").setURI("/extrafoot/SYM_LOGIN.goConnect").setSsl(true), response -> {
-				sub.onNext(response);
-				sub.onComplete();
-			}).end(body);
+			client.post(new RequestOptions().setPort(443)
+					.setHost("footclubs.fff.fr")
+					.setURI("/extrafoot/SYM_LOGIN.goConnect")
+					.setSsl(true), response -> {
+						sub.onNext(response);
+						sub.onComplete();
+					})
+					.end(body);
 		});
 	}
 
 	private Observable<String> retrieveLicencies(String cookie, String queryParam) {
-		return Observable.create(
-				sub -> client.get(new RequestOptions().setPort(443).setHost("footclubs.fff.fr").setURI(LICENCE_PATH + queryParam).setSsl(true), response -> {
+		return Observable.create(sub -> client.get(new RequestOptions().setPort(443)
+				.setHost("footclubs.fff.fr")
+				.setURI(LICENCE_PATH + queryParam)
+				.setSsl(true), response -> {
 					response.bodyHandler(buffer -> {
 						String body = new String(buffer.getBytes(), Charset.forName("ISO-8859-15"));
 						sub.onNext(body);
 						sub.onComplete();
 					});
-				}).putHeader("Cookie", cookie).end());
+				})
+				.putHeader("Cookie", cookie)
+				.end());
 	}
 
 }
